@@ -1042,6 +1042,19 @@ public:
         set_title(new MenuEntry("", MEL_TITLE));
     }
 
+    struct keyItem {
+        string key;
+        string action;
+        macromap map;
+        int code;
+        deque<int> first;
+    };
+
+    static bool sortcol(const keyItem& a, const keyItem& b)
+    {
+        return a.key < b.key;
+    }
+
     void fill_entries(int set_hover_keycode=0)
     {
         // TODO: this seems like somehow it should involve ui::Switcher, but I
@@ -1070,21 +1083,35 @@ public:
 
             add_entry(clear_entry);
             add_entry(new MenuEntry("Current " + mode_name() + "s", MEL_SUBTITLE));
+            vector<keyItem> keys;
             for (auto &mapping : get_map())
             {
                 // TODO: indicate if macro is from rc file somehow?
                 string action_str = vtostr(mapping.second);
                 action_str = replace_all(action_str, "<", "<<");
-                MenuEntry *me = new MenuEntry(action_str, (int) mapping.first[0],
-                    [this](const MenuEntry &item)
-                    {
-                        if (item.data)
-                            edit_mapping(*static_cast<keyseq *>(item.data));
-                        return true;
-                    });
-                me->data = (void *) &mapping.first;
+                int keycode = (int) mapping.first[0];
+                string key = keycode_to_name(keycode, false).c_str();
+                keyItem aKey;
+                aKey.key = key;
+                aKey.action = action_str;
+                aKey.code = keycode;
+                aKey.first = mapping.first;
+                keys.push_back(aKey);
+            }
+            sort(keys.begin(), keys.end(), sortcol);
+            for (int i = 0; i < keys.size(); i++)
+            {
+                // TODO: indicate if macro is from rc file somehow?
+                MenuEntry *me = new MenuEntry(keys[i].action, (int) keys[i].first[0],
+                                              [this](const MenuEntry &item)
+                                              {
+                                                  if (item.data)
+                                                      edit_mapping(*static_cast<keyseq *>(item.data));
+                                                  return true;
+                                              });
+                me->data = (void *) &keys[i].first;
                 add_entry(me);
-                if (set_hover_keycode == mapping.first[0])
+                if (set_hover_keycode == keys[i].first[0])
                     last_hovered = item_count() - 1;
             }
         }
